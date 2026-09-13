@@ -2,118 +2,107 @@
 <html lang="ta">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>மயிலாடுதுறை மாவட்டக்குழு — தினசரி தரவு பதிவு</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#d50000">
+<title>DYFI Daily Data — மயிலாடுதுறை</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 </head>
 <body>
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">DYFI</div>
+    <h1>தினசரி தரவு பதிவு</h1>
+    <p>மயிலாடுதுறை மாவட்டக்குழு</p>
+    <div class="login-tabs">
+      <button class="login-tab active" id="userTab">கமிட்டி Login</button>
+      <button class="login-tab" id="adminTab">Admin Login</button>
+    </div>
+    <form id="userLoginForm">
+      <label>பெயர்<input id="loginName" required autocomplete="name" placeholder="உங்கள் பெயர்"></label>
+      <label>கமிட்டி<select id="loginCommittee" required></select></label>
+      <button class="primary wide" type="submit">உள்ளே செல்லவும்</button>
+    </form>
+    <form id="adminLoginForm" class="hidden">
+      <label>Admin Name<input id="adminName" required autocomplete="username" placeholder="Admin name"></label>
+      <label>Password<input id="adminPassword" required type="password" autocomplete="current-password" placeholder="Password"></label>
+      <button class="primary wide" type="submit">Admin Login</button>
+    </form>
+    <small class="login-note">தேர்ந்தெடுத்த கமிட்டியின் தரவுகள் மட்டுமே சாதாரண பயனருக்கு காட்டப்படும்.</small>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
 <header class="topbar">
   <div>
     <div class="eyebrow">இந்திய கம்யூனிஸ்ட் கட்சி (மார்க்சிஸ்ட்)</div>
     <h1>மயிலாடுதுறை மாவட்டக்குழு</h1>
-    <p>2026 ஜூலை மாதம் நடைபெற்ற கூட்டம் விவரங்கள்</p>
+    <p id="monthTitle">—</p>
   </div>
-  <div class="header-actions">
-    <button class="ghost" id="exportBtn">⬇ தரவு Backup</button>
-    <label class="ghost file-btn">⬆ Restore
-      <input type="file" id="importFile" accept=".json" hidden>
-    </label>
+  <div class="session-box">
+    <div><span id="sessionRole">கமிட்டி</span><b id="sessionUser">—</b><small id="sessionCommittee">—</small></div>
+    <button class="ghost" id="logoutBtn">வெளியேறு</button>
   </div>
 </header>
 
 <main class="container">
+  <section class="admin-switch hidden" id="adminSwitch">
+    <label>Admin — எந்த கமிட்டி தரவை நிர்வகிக்க வேண்டும்?
+      <select id="adminCommittee"></select>
+    </label>
+    <span class="admin-badge">FULL ACCESS</span>
+  </section>
+
   <section class="stats">
     <div class="stat"><span>மொத்த பதிவுகள்</span><strong id="statRecords">0</strong></div>
+    <div class="stat"><span>மொத்த கிளைகள்</span><strong id="statBranches">0</strong></div>
     <div class="stat"><span>உறுப்பினர் எண்ணிக்கை</span><strong id="statMembers">0</strong></div>
     <div class="stat"><span>நடைபெற்ற கூட்டம்</span><strong id="statMeetings">0</strong></div>
-    <div class="stat"><span>பங்கேற்றவர்கள்</span><strong id="statPresent">0</strong></div>
   </section>
 
   <section class="card form-card">
-    <div class="section-title">
-      <div><span class="badge">01</span><h2>தினசரி தரவு பதிவு</h2></div>
-      <span class="hint">உள்ளிட்ட தகவல் இந்த சாதனத்தின் Local Storage-ல் சேமிக்கப்படும்.</span>
-    </div>
-
+    <div class="section-title"><div><span class="badge">01</span><h2>தினசரி தரவு பதிவு</h2></div><span class="hint" id="syncStatus">Server இணைக்கப்படுகிறது…</span></div>
     <form id="dataForm">
-      <input type="hidden" id="editId">
+      <input type="hidden" id="editKey">
       <div class="grid two">
-        <label>தேதி
-          <input type="date" id="date" required>
-        </label>
-        <label>இடம் / அமைப்பு
-          <select id="place" required></select>
-        </label>
+        <label>தேதி<input type="date" id="date" required></label>
+        <label>இடம் / அமைப்பு<select id="place" required></select></label>
       </div>
-
       <div class="auto-place">
         <div><small>வரிசை எண்</small><b id="placeNo">—</b></div>
         <div><small>தேர்ந்தெடுத்த இடம்</small><b id="placeName">—</b></div>
       </div>
-
       <div class="field-grid">
-        <label>இடைக்கமிட்டிகள்
-          <input type="number" min="0" id="committees" placeholder="எ.கா. 40" required>
-        </label>
-        <label>மொத்தம் கிளைகள்
-          <input type="number" min="0" id="branches" placeholder="எ.கா. 606" required>
-        </label>
-        <label>உறுப்பினர் எண்ணிக்கை
-          <input type="number" min="0" id="members" placeholder="எ.கா. 15" required>
-        </label>
-        <label>நடைபெற்ற கூட்டம்
-          <input type="number" min="0" id="meetings" placeholder="எ.கா. 214" required>
-        </label>
-        <label>பங்கேற்க வேண்டியவர்கள்
-          <input type="number" min="0" id="expected" placeholder="எ.கா. 169" required>
-        </label>
-        <label>பங்கேற்றவர்கள்
-          <input type="number" min="0" id="present" placeholder="எ.கா. 150" required>
-        </label>
+        <label>மொத்தம் கிளைகள்<input type="number" min="0" id="branches" inputmode="numeric" required></label>
+        <label>உறுப்பினர் எண்ணிக்கை<input type="number" min="0" id="members" inputmode="numeric" required></label>
+        <label>நடைபெற்ற கூட்டம்<input type="number" min="0" id="meetings" inputmode="numeric" required></label>
+        <label>பங்கேற்க வேண்டியவர்கள்<input type="number" min="0" id="expected" inputmode="numeric" required></label>
+        <label>பங்கேற்றவர்கள்<input type="number" min="0" id="present" inputmode="numeric" required></label>
       </div>
-
-      <label>குறிப்பு
-        <textarea id="note" rows="2" placeholder="தேவையான கூடுதல் குறிப்புகள்..."></textarea>
-      </label>
-
-      <div class="form-actions">
-        <button class="primary" type="submit" id="saveBtn">＋ பதிவு சேமிக்கவும்</button>
-        <button class="secondary" type="button" id="resetBtn">புதிய பதிவு</button>
-      </div>
+      <div class="form-actions"><button class="primary" type="submit" id="saveBtn">＋ பதிவு சேமிக்கவும்</button><button class="secondary" type="button" id="resetBtn">புதிய பதிவு</button></div>
     </form>
   </section>
 
   <section class="card">
-    <div class="section-title">
-      <div><span class="badge">02</span><h2>சேமிக்கப்பட்ட பதிவுகள்</h2></div>
-      <input class="search" id="search" placeholder="🔎 இடம் / தேதி தேடுக...">
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>எண்</th><th>தேதி</th><th>இடம்</th><th>இடைக்கமிட்டிகள்</th><th>கிளைகள்</th>
-            <th>உறுப்பினர்கள்</th><th>கூட்டம்</th><th>வேண்டியவர்கள்</th><th>பங்கேற்றவர்கள்</th><th>செயல்கள்</th>
-          </tr>
-        </thead>
-        <tbody id="recordsBody"></tbody>
-      </table>
-      <div id="empty" class="empty">இன்னும் எந்த பதிவும் இல்லை.</div>
-    </div>
+    <div class="section-title"><div><span class="badge">02</span><h2>சேமிக்கப்பட்ட பதிவுகள்</h2></div><input class="search" id="search" placeholder="🔎 இடம் / தேதி தேடுக..."></div>
+    <div class="table-wrap"><table><thead><tr><th>எண்</th><th>தேதி</th><th>இடம்</th><th>கிளைகள்</th><th>உறுப்பினர்கள்</th><th>கூட்டம்</th><th>வேண்டியவர்கள்</th><th>பங்கேற்றவர்கள்</th><th>செயல்கள்</th></tr></thead><tbody id="recordsBody"></tbody></table><div id="empty" class="empty">இன்னும் எந்த பதிவும் இல்லை.</div></div>
   </section>
 
-  <section class="card summary-card">
-    <div class="section-title">
-      <div><span class="badge">03</span><h2>இட வாரியான சுருக்கம்</h2></div>
-      <button class="primary small" id="summaryPdf">முழு சுருக்கம் PDF</button>
-    </div>
+  <section class="card">
+    <div class="section-title"><div><span class="badge">03</span><h2>சுருக்கம்</h2></div><button class="primary small" id="summaryPdf">முழு சுருக்கம் PDF</button></div>
     <div id="summaryGrid" class="summary-grid"></div>
   </section>
-</main>
 
+  <section class="card backup-card">
+    <button class="secondary" id="exportBtn">⬇ Backup</button>
+    <label class="secondary file-btn">⬆ Restore<input type="file" id="importFile" accept=".json" hidden></label>
+  </section>
+</main>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

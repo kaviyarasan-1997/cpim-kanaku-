@@ -1,416 +1,76 @@
-const PLACES = [
-  {no:1,name:"தரங்கம்பாடி",defaults:{committees:40,branches:606,members:15,meetings:214,expected:169}},
-  {no:2,name:"செம்பனார்கோவில்",defaults:{committees:17,branches:188,members:7,meetings:119,expected:73}},
-  {no:3,name:"குத்தாலம் கிழக்கு",defaults:{committees:16,branches:217,members:1,meetings:13,expected:9}},
-  {no:4,name:"குத்தாலம் மேற்கு",defaults:{committees:13,branches:181,members:3,meetings:52,expected:28}},
-  {no:5,name:"மயிலாடுதுறை (ஒ)",defaults:{committees:23,branches:238,members:5,meetings:50,expected:29}},
-  {no:6,name:"மயிலாடுதுறை (ந)",defaults:{committees:7,branches:59,members:1,meetings:12,expected:8}},
-  {no:7,name:"சீர்காழி",defaults:{committees:13,branches:209,members:1,meetings:17,expected:12}},
-  {no:8,name:"கொள்ளிடம்",defaults:{committees:20,branches:277,members:9,meetings:159,expected:121}},
-  {no:9,name:"மாணவர்",defaults:{committees:3,branches:20,members:0,meetings:0,expected:0}},
-  {no:10,name:"ஆசிரியர்",defaults:{committees:1,branches:7,members:0,meetings:0,expected:0}},
-  {no:11,name:"எல்.ஐ.சி",defaults:{committees:1,branches:6,members:0,meetings:0,expected:0}},
-  {no:12,name:"அரசு ஊழியர்",defaults:{committees:0,branches:10,members:0,meetings:0,expected:0}},
-  {no:13,name:"மாவட்ட மையம்",defaults:{committees:0,branches:10,members:0,meetings:0,expected:0}}
+const FIREBASE_CONFIG={apiKey:"AIzaSyCaALqxdtEPCNxg5XPPG81T9853gOPO4qY",authDomain:"server-41203.firebaseapp.com",databaseURL:"https://server-41203-default-rtdb.firebaseio.com",projectId:"server-41203",storageBucket:"server-41203.firebasestorage.app",messagingSenderId:"26278139327",appId:"1:26278139327:web:db44a7e2d8d42d690abd0a"};
+const ADMIN_NAME="Kaviyarasan",ADMIN_PASSWORD="0987654321";
+const PLACES=[
+{no:1,name:"தரங்கம்பாடி",defaults:{branches:606,members:15,meetings:214,expected:169}},
+{no:2,name:"செம்பனார்கோவில்",defaults:{branches:188,members:7,meetings:119,expected:73}},
+{no:3,name:"குத்தாலம் கிழக்கு",defaults:{branches:217,members:1,meetings:13,expected:9}},
+{no:4,name:"குத்தாலம் மேற்கு",defaults:{branches:181,members:3,meetings:52,expected:28}},
+{no:5,name:"மயிலாடுதுறை (ஒ)",defaults:{branches:238,members:5,meetings:50,expected:29}},
+{no:6,name:"மயிலாடுதுறை (ந)",defaults:{branches:59,members:1,meetings:12,expected:8}},
+{no:7,name:"சீர்காழி",defaults:{branches:209,members:1,meetings:17,expected:12}},
+{no:8,name:"கொள்ளிடம்",defaults:{branches:277,members:9,meetings:159,expected:121}},
+{no:9,name:"மாணவர்",defaults:{branches:20,members:0,meetings:0,expected:0}},
+{no:10,name:"ஆசிரியர்",defaults:{branches:7,members:0,meetings:0,expected:0}},
+{no:11,name:"எல்.ஐ.சி",defaults:{branches:6,members:0,meetings:0,expected:0}},
+{no:12,name:"அரசு ஊழியர்",defaults:{branches:10,members:0,meetings:0,expected:0}},
+{no:13,name:"மாவட்ட மையம்",defaults:{branches:10,members:0,meetings:0,expected:0}}
 ];
-const KEY="dyfi_mayiladuthurai_daily_v2";
-const $=id=>document.getElementById(id);
-let records=JSON.parse(localStorage.getItem(KEY)||"[]");
-function save(){localStorage.setItem(KEY,JSON.stringify(records));}
-function today(){return new Date().toISOString().slice(0,10)}
-function num(id){return Math.max(0,Number($(id).value)||0)}
-function initPlaces(){
-  $("place").innerHTML='<option value="">— இடத்தை தேர்வு செய்யவும் —</option>'+PLACES.map(p=>`<option value="${p.no}">${p.no}. ${p.name}</option>`).join("");
-  $("date").value=today();
-}
+const KEY="dyfi_mayiladuthurai_session_v4",DATA_KEY="dyfi_mayiladuthurai_cache_v4";
+const $=id=>document.getElementById(id);let db=null,records=[],session=null,activeCommittee=null;
+const today=()=>{const d=new Date();return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(d)},num=id=>Math.max(0,Number($(id).value)||0);
+const TAMIL_MONTHS=["ஜனவரி","பிப்ரவரி","மார்ச்","ஏப்ரல்","மே","ஜூன்","ஜூலை","ஆகஸ்ட்","செப்டம்பர்","அக்டோபர்","நவம்பர்","டிசம்பர்"];
+function monthTitle(dateStr){const d=dateStr?new Date(`${dateStr}T00:00:00`):new Date();return `${d.getFullYear()} ${TAMIL_MONTHS[d.getMonth()]} மாதம் நடைபெற்ற கூட்டம் விவரங்கள்`}
+function dMonthYear(dateStr){const d=dateStr?new Date(`${dateStr}T00:00:00`):new Date();return `${TAMIL_MONTHS[d.getMonth()]} ${d.getFullYear()}`}
+function updateMonthTexts(dateStr){const h=document.querySelector(".topbar p");if(h)h.textContent=monthTitle(dateStr);document.title=`DYFI Daily Data — மயிலாடுதுறை — ${dMonthYear(dateStr)}`;}
+function placesOptions(){return '<option value="">— கமிட்டியை தேர்வு செய்யவும் —</option>'+PLACES.map(p=>`<option value="${p.no}">${p.no}. ${p.name}</option>`).join('')}
+function initFirebase(){try{if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();setStatus('Server இணைக்கப்பட்டது','ok');return true}catch(e){setStatus('Server connection error','bad');return false}}
+function setStatus(t,c=''){const el=$("syncStatus");if(el){el.textContent=t;el.className='hint '+c}}
 function selectedPlace(){return PLACES.find(p=>p.no===Number($("place").value))}
-function showPlace(){const p=selectedPlace();$("placeNo").textContent=p?p.no:"—";$("placeName").textContent=p?p.name:"—"}
-$("place").addEventListener("change",()=>{showPlace();const p=selectedPlace();if(!p)return;["committees","branches","members","meetings","expected"].forEach(k=>$(k).value=p.defaults[k]);$("present").value="";});
-$("resetBtn").onclick=()=>{$("dataForm").reset();$("editId").value="";$("date").value=today();$("saveBtn").textContent="＋ பதிவு சேமிக்கவும்";showPlace()};
-$("dataForm").addEventListener("submit",e=>{e.preventDefault();const p=selectedPlace();if(!p)return alert("இடத்தை தேர்வு செய்யவும்.");const obj={id:$('editId').value||crypto.randomUUID(),date:$('date').value,placeNo:p.no,place:p.name,committees:num('committees'),branches:num('branches'),members:num('members'),meetings:num('meetings'),expected:num('expected'),present:num('present')};const idx=records.findIndex(r=>r.id===obj.id);if(idx>=0)records[idx]=obj;else records.unshift(obj);save();render();$("resetBtn").click();alert(idx>=0?"பதிவு புதுப்பிக்கப்பட்டது.":"பதிவு சேமிக்கப்பட்டது.")});
-function render(){
- const q=$("search").value.trim().toLowerCase();const list=records.filter(r=>(r.place+" "+r.date).toLowerCase().includes(q));
- $("recordsBody").innerHTML=list.map(r=>`<tr><td>${r.placeNo}</td><td>${r.date}</td><td class="place-cell">${r.place}</td><td>${r.committees}</td><td>${r.branches}</td><td>${r.members}</td><td>${r.meetings}</td><td>${r.expected}</td><td>${r.present}</td><td><div class="actions"><button class="icon-btn" onclick="editRecord('${r.id}')">✏️</button><button class="icon-btn" onclick="downloadPDF('${r.id}')">📄</button><button class="icon-btn danger" onclick="deleteRecord('${r.id}')">🗑️</button></div></td></tr>`).join("");
- $("empty").style.display=list.length?"none":"block";const sum=k=>records.reduce((a,r)=>a+(Number(r[k])||0),0);$("statRecords").textContent=records.length;$("statMembers").textContent=sum('members').toLocaleString('en-IN');$("statMeetings").textContent=sum('meetings').toLocaleString('en-IN');$("statPresent").textContent=sum('present').toLocaleString('en-IN');
- $("summaryGrid").innerHTML=PLACES.map(p=>{const rs=records.filter(r=>r.placeNo===p.no);return `<div class="summary-item"><h3>${p.no}. ${p.name}</h3><p>பதிவுகள்: <b>${rs.length}</b></p><p>உறுப்பினர்கள்: <b>${rs.reduce((a,r)=>a+r.members,0)}</b></p><p>கூட்டம்: <b>${rs.reduce((a,r)=>a+r.meetings,0)}</b></p><p>கடைசி தேதி: <b>${rs[0]?.date||"—"}</b></p></div>`}).join("");
+function activePlace(){return PLACES.find(p=>p.no===Number(activeCommittee))}
+function storageKey(c){return `${DATA_KEY}_${c}`}
+function normalize(r,key){return {key:key||r.key||`${r.date}__${r.placeNo}`,date:r.date,placeNo:Number(r.placeNo),place:r.place,branches:Number(r.branches)||0,members:Number(r.members)||0,meetings:Number(r.meetings)||0,expected:Number(r.expected)||0,present:Number(r.present)||0}}
+function dedupe(list){const m=new Map();list.forEach(r=>{const n=normalize(r);m.set(`${n.date}__${n.placeNo}`,n)});return [...m.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.placeNo-b.placeNo)}
+function saveCache(){if(activeCommittee)localStorage.setItem(storageKey(activeCommittee),JSON.stringify(records))}
+async function loadCommittee(c){activeCommittee=Number(c);records=[];const cached=JSON.parse(localStorage.getItem(storageKey(activeCommittee))||'[]');records=dedupe(cached);render();
+ if(!db){setStatus('LocalStorage மட்டும்','bad');return}
+ setStatus('Server data loading…');
+ try{const snap=await db.ref(`dyfiDaily/${activeCommittee}`).once('value');const remote=[];snap.forEach(ch=>remote.push(normalize(ch.val(),ch.key)));records=dedupe([...remote,...records]);saveCache();render();setStatus('Server synced','ok');}catch(e){setStatus('Server read error — local data','bad');console.error(e)}
 }
-$("search").addEventListener("input",render);
-window.editRecord=id=>{const r=records.find(x=>x.id===id);if(!r)return;$("editId").value=r.id;$("date").value=r.date;$("place").value=r.placeNo;showPlace();["committees","branches","members","meetings","expected","present"].forEach(k=>$(k).value=r[k]);$("saveBtn").textContent="✓ மாற்றத்தை சேமிக்கவும்";scrollTo({top:0,behavior:"smooth"})};
-window.deleteRecord=id=>{if(!confirm("இந்த பதிவை நீக்க வேண்டுமா?"))return;records=records.filter(r=>r.id!==id);save();render()};
-
-// ---------- Accurate PDF generator: no external libraries ----------
-// PDF is drawn as a clean A4-landscape image.  No extra fields are added.
-// Tamil headers and long place names are wrapped line-by-line so they never overlap.
-
-const PDF_HEADERS = [
-  '',
-  'இடைக்கமிட்டிகள்',
-  'மொத்தம் கிளைகள்',
-  'உறுப்பினர் எண்ணிக்கை',
-  'நடைபெற்ற கூட்டம்',
-  'பங்கேற்க வேண்டியவர்கள்',
-  'பங்கேற்றவர்கள்'
-];
-
-function wrapTamil(ctx, text, maxWidth) {
-  const value = String(text ?? '').trim();
-  if (!value) return [''];
-  // Keep words together where possible; only split a word if it is wider than the cell.
-  const words = value.split(/\s+/);
-  const lines = [];
-  let line = '';
-  for (const word of words) {
-    const candidate = line ? line + ' ' + word : word;
-    if (ctx.measureText(candidate).width <= maxWidth) {
-      line = candidate;
-    } else if (!line) {
-      let part = '';
-      for (const ch of Array.from(word)) {
-        const test = part + ch;
-        if (ctx.measureText(test).width <= maxWidth || !part) part = test;
-        else { lines.push(part); part = ch; }
-      }
-      if (part) line = part;
-    } else {
-      lines.push(line);
-      line = word;
-      if (ctx.measureText(line).width > maxWidth) {
-        let part = '';
-        for (const ch of Array.from(line)) {
-          const test = part + ch;
-          if (ctx.measureText(test).width <= maxWidth || !part) part = test;
-          else { lines.push(part); part = ch; }
-        }
-        line = part;
-      }
-    }
-  }
-  if (line) lines.push(line);
-  return lines.length ? lines : [''];
+async function writeRecord(obj){const key=`${obj.date}__${obj.placeNo}`;obj.key=key;records=dedupe([...records,obj]);saveCache();render();
+ if(!db)return setStatus('LocalStorage saved','bad');
+ try{await db.ref(`dyfiDaily/${activeCommittee}/${key}`).set(obj);setStatus('Saved to server','ok');}catch(e){setStatus('Server save failed — local copy kept','bad');console.error(e)}
 }
+async function removeRecord(r){records=records.filter(x=>x.key!==r.key);saveCache();render();if(db){try{await db.ref(`dyfiDaily/${activeCommittee}/${r.key}`).remove();setStatus('Deleted from server','ok')}catch(e){setStatus('Server delete failed','bad')}}}
+function fillPlaces(){const html=placesOptions();$("loginCommittee").innerHTML=html;$("place").innerHTML='<option value="">— இடத்தை தேர்வு செய்யவும் —</option>'+PLACES.map(p=>`<option value="${p.no}">${p.no}. ${p.name}</option>`).join('');$("adminCommittee").innerHTML=html}
+function showPlace(){const p=selectedPlace();$("placeNo").textContent=p?p.no:'—';$("placeName").textContent=p?p.name:'—'}
+function resetForm(){$("dataForm").reset();$("editKey").value='';$("date").value=today();updateMonthTexts($("date").value);$("saveBtn").textContent='＋ பதிவு சேமிக்கவும்';showPlace()}
+function render(){const q=$("search").value.trim().toLowerCase();const list=records.filter(r=>(`${r.place} ${r.date}`).toLowerCase().includes(q));$("recordsBody").innerHTML=list.map(r=>`<tr><td>${r.placeNo}.</td><td>${r.date}</td><td class="place-cell">${r.place}</td><td>${r.branches}</td><td>${r.members}</td><td>${r.meetings}</td><td>${r.expected}</td><td>${r.present}</td><td><div class="actions"><button class="icon-btn" onclick="editRecord('${r.key}')">✏️</button><button class="icon-btn" onclick="downloadPDF('${r.key}')">📄</button><button class="icon-btn danger" onclick="deleteRecord('${r.key}')">🗑️</button></div></td></tr>`).join('');$("empty").style.display=list.length?'none':'block';const sum=k=>records.reduce((a,r)=>a+(Number(r[k])||0),0);$("statRecords").textContent=records.length;$("statBranches").textContent=sum('branches').toLocaleString('en-IN');$("statMembers").textContent=sum('members').toLocaleString('en-IN');$("statMeetings").textContent=sum('meetings').toLocaleString('en-IN');$("summaryGrid").innerHTML=activePlace()?`<div class="summary-item"><h3>${activePlace().no}. ${activePlace().name}</h3><p>பதிவுகள்: <b>${records.length}</b></p><p>கிளைகள்: <b>${sum('branches')}</b></p><p>உறுப்பினர்கள்: <b>${sum('members')}</b></p><p>கூட்டம்: <b>${sum('meetings')}</b></p></div>`:''}
+window.editRecord=key=>{const r=records.find(x=>x.key===key);if(!r)return;$("editKey").value=r.key;$("date").value=r.date;updateMonthTexts(r.date);$("place").value=r.placeNo;showPlace();['branches','members','meetings','expected','present'].forEach(k=>$(k).value=r[k]);$("saveBtn").textContent='✓ மாற்றத்தை சேமிக்கவும்';scrollTo({top:0,behavior:'smooth'})};
+window.deleteRecord=async key=>{const r=records.find(x=>x.key===key);if(r&&confirm('இந்த பதிவை நீக்க வேண்டுமா?'))await removeRecord(r)};
+$("place").addEventListener('change',()=>{showPlace();const p=selectedPlace();if(!p)return;['branches','members','meetings','expected'].forEach(k=>$(k).value=p.defaults[k]);$("present").value=''})
+$("resetBtn").onclick=resetForm;$("date").addEventListener('change',()=>updateMonthTexts($("date").value));$("search").addEventListener('input',render);
+$("dataForm").onsubmit=async e=>{e.preventDefault();const p=selectedPlace();if(!p||!activeCommittee)return alert('கமிட்டி / இடத்தை தேர்வு செய்யவும்.');const oldKey=$("editKey").value;const obj={key:`${$("date").value}__${p.no}`,date:$("date").value,placeNo:p.no,place:p.name,branches:num('branches'),members:num('members'),meetings:num('meetings'),expected:num('expected'),present:num('present')};if(oldKey&&oldKey!==obj.key&&records.some(r=>r.key===obj.key))return alert('இந்த தேதி + இடத்திற்கு ஏற்கனவே பதிவு உள்ளது. அதை Edit செய்து Save செய்யவும்.');await writeRecord(obj);resetForm();alert(oldKey?'மாற்றம் சேமிக்கப்பட்டது.':'பதிவு சேமிக்கப்பட்டது.')};
+async function loginUser(){const name=$("loginName").value.trim();const c=Number($("loginCommittee").value);if(!name||!c)return;session={role:'user',name,committee:c};localStorage.setItem(KEY,JSON.stringify(session));openApp()}
+async function loginAdmin(){if($("adminName").value.trim()!==ADMIN_NAME||$("adminPassword").value!==ADMIN_PASSWORD)return alert('Admin name / password தவறாக உள்ளது.');session={role:'admin',name:ADMIN_NAME,committee:Number($("adminCommittee").value)||1};localStorage.setItem(KEY,JSON.stringify(session));openApp()}
+function openApp(){if(!session)return;$("loginScreen").classList.add('hidden');$("app").classList.remove('hidden');$("sessionRole").textContent=session.role==='admin'?'ADMIN':'கமிட்டி';$("sessionUser").textContent=session.name;$("sessionCommittee").textContent=PLACES.find(p=>p.no===Number(session.committee))?.name||'—';$("adminSwitch").classList.toggle('hidden',session.role!=='admin');$("adminCommittee").value=session.committee;$("place").disabled=false;activeCommittee=session.committee;loadCommittee(session.committee);resetForm()}
+$("userLoginForm").onsubmit=e=>{e.preventDefault();loginUser()};$("adminLoginForm").onsubmit=e=>{e.preventDefault();loginAdmin()};$("userTab").onclick=()=>{$("userTab").classList.add('active');$("adminTab").classList.remove('active');$("userLoginForm").classList.remove('hidden');$("adminLoginForm").classList.add('hidden')};$("adminTab").onclick=()=>{$("adminTab").classList.add('active');$("userTab").classList.remove('active');$("adminLoginForm").classList.remove('hidden');$("userLoginForm").classList.add('hidden')};
+$("adminCommittee").onchange=async()=>{if(session?.role!=='admin')return;session.committee=Number($("adminCommittee").value);localStorage.setItem(KEY,JSON.stringify(session));$("sessionCommittee").textContent=PLACES.find(p=>p.no===session.committee)?.name||'—';resetForm();await loadCommittee(session.committee)};
+$("logoutBtn").onclick=()=>{localStorage.removeItem(KEY);location.reload()};
+$("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(records,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`DYFI_${activeCommittee}_backup_${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+$("importFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=async()=>{try{const data=JSON.parse(rd.result);if(!Array.isArray(data))throw 0;for(const r of dedupe(data))await writeRecord(r);alert('Backup restore செய்யப்பட்டது.')}catch{alert('சரியான JSON backup இல்லை.')}e.target.value=''};rd.readAsText(f)};
 
-function drawWrapped(ctx, text, x, centerY, maxWidth, font, align='center', lineHeight=28) {
-  ctx.font = font;
-  const lines = wrapTamil(ctx, text, maxWidth);
-  ctx.textAlign = align;
-  ctx.textBaseline = 'middle';
-  const start = centerY - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, i) => ctx.fillText(line, x, start + i * lineHeight));
-  return lines.length;
-}
-
-function waitForTamilFont() {
-  if (document.fonts && document.fonts.ready) return document.fonts.ready;
-  return Promise.resolve();
-}
-
-function drawPdfPage(rows) {
-  // A4 landscape ratio (297:210), high-resolution canvas.
-  const W = 1754;
-  const x = 70;
-  const tw = W - x * 2;
-  const y = 242;
-  const headerH = 112;
-  const rowH = 58;
-  const totalH = 72;
-  const bottomPadding = 28;
-  const hasTotal = rows.length > 1;
-  const tableH = headerH + rows.length * rowH + (hasTotal ? totalH : 0);
-  const H = y + tableH + bottomPadding;
-
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#111111';
-  ctx.strokeStyle = '#222222';
-  ctx.lineWidth = 1.4;
-
-  // Exact reference title — no date, note, timestamp or other extra information.
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '700 34px "Noto Sans Tamil", sans-serif';
-  ctx.fillText('இந்திய கம்யூனிஸ்ட் கட்சி (மார்க்சிஸ்ட்)', W / 2, 67);
-  ctx.font = '700 29px "Noto Sans Tamil", sans-serif';
-  ctx.fillText('மயிலாடுதுறை மாவட்டக்குழு', W / 2, 113);
-  ctx.font = '700 27px "Noto Sans Tamil", sans-serif';
-  ctx.fillText('2026 ஜூலை மாதம் நடைபெற்ற கூட்டம் விவரங்கள்', W / 2, 157);
-
-  // Same 7-column structure as the supplied reference.
-  const widths = [75, 315, 175, 230, 205, 275, 319];
-  let cx = x;
-  ctx.strokeRect(x, y, tw, tableH);
-  for (const w of widths.slice(0, -1)) {
-    cx += w;
-    ctx.beginPath();
-    ctx.moveTo(cx, y);
-    ctx.lineTo(cx, y + tableH);
-    ctx.stroke();
-  }
-  ctx.beginPath(); ctx.moveTo(x, y + headerH); ctx.lineTo(x + tw, y + headerH); ctx.stroke();
-  for (let i = 1; i <= rows.length; i++) {
-    const yy = y + headerH + i * rowH;
-    ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + tw, yy); ctx.stroke();
-  }
-
-  // Header: deliberately wrapped. Examples:
-  // நடைபெற்ற கூட்டம் -> நடைபெற்ற / கூட்டம்
-  // கூட்டத்தில் கலந்து கொள்ள வேண்டியவர்கள் -> கூட்டத்தில் கலந்து / கொள்ள வேண்டியவர்கள்
-  cx = x;
-  PDF_HEADERS.forEach((h, i) => {
-    const w = widths[i];
-    if (i === 0) {
-      cx += w;
-      return;
-    }
-    drawWrapped(ctx, h, cx + w / 2, y + headerH / 2, w - 22,
-      '700 21px "Noto Sans Tamil", sans-serif', 'center', 28);
-    cx += w;
-  });
-
-  // Body: location remains in column 2 exactly like the reference image.
-  rows.forEach((r, ri) => {
-    const cy = y + headerH + ri * rowH + rowH / 2;
-    const vals = [String(r.placeNo) + '.', r.place, r.committees, r.branches, r.members, r.meetings, r.expected];
-    cx = x;
-    vals.forEach((v, i) => {
-      const w = widths[i];
-      if (i === 1) {
-        drawWrapped(ctx, v, cx + 13, cy, w - 24,
-          '700 22px "Noto Sans Tamil", sans-serif', 'left', 24);
-      } else {
-        ctx.font = '700 22px "Noto Sans Tamil", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(v), cx + w / 2, cy);
-      }
-      cx += w;
-    });
-  });
-
-  if (hasTotal) {
-    const totalY = y + headerH + rows.length * rowH;
-    const total = key => rows.reduce((a, r) => a + (Number(r[key]) || 0), 0);
-    // Reference total for the supplied 13-row July table; otherwise calculate from saved rows.
-    const isReference = rows.length === 13 && rows.every(r => r.date === '2026-07-31');
-    const tv = ['', 'கூட்டல்', isReference ? 156 : total('committees'), total('branches'), total('members'), total('meetings'), total('expected')];
-    cx = x;
-    tv.forEach((v, i) => {
-      const w = widths[i];
-      if (i === 1) {
-        ctx.font = '700 22px "Noto Sans Tamil", sans-serif';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(v), cx + w - 14, totalY + totalH / 2);
-      } else {
-        ctx.font = '700 22px "Noto Sans Tamil", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(v), cx + w / 2, totalY + totalH / 2);
-      }
-      cx += w;
-    });
-  }
-  return c.toDataURL('image/jpeg', 0.97);
-}
-
-function base64ToBytes(data) {
-  const b = atob(data.split(',')[1]);
-  const a = new Uint8Array(b.length);
-  for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
-  return a;
-}
-
-function pdfFromJpegs(images, filename) {
-  const enc = new TextEncoder();
-  const chunks = [];
-  const offsets = [];
-  let pos = 0;
-  const add = b => { chunks.push(b); pos += b.length; };
-  const txt = s => enc.encode(s);
-  add(txt('%PDF-1.3\n%\xFF\xFF\xFF\xFF\n'));
-
-  let n = 2;
-  const pages = [];
-  images.forEach(data => {
-    const img = base64ToBytes(data);
-    const idImg = n++, idContent = n++, idPage = n++;
-    pages.push({ idPage, idImg, idContent, img });
-  });
-  const pagesId = n++, catalogId = n++;
-
-  // A4 landscape in points.
-  const pageW = 841.89;
-  const pageH = 595.28;
-  pages.forEach(p => {
-    offsets[p.idImg] = pos;
-    add(txt(`${p.idImg} 0 obj\n<< /Type /XObject /Subtype /Image /Width 1754 /Height ${Math.round(p.img.length ? 1 : 1)} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.img.length} >>\nstream\n`));
-    // Height is patched below using the actual JPEG canvas ratio through image metadata-free scaling.
-    // Use a fixed A4 landscape box and preserve the source aspect ratio with contain scaling.
-    add(p.img);
-    add(txt('\nendstream\nendobj\n'));
-
-    // JPEG dimensions are not conveniently available without parsing. The canvas always uses W=1754;
-    // derive height from the encoded JPEG SOF marker.
-    let ih = 1240;
-    for (let i = 0; i < p.img.length - 9; i++) {
-      if (p.img[i] === 0xFF && p.img[i + 1] >= 0xC0 && p.img[i + 1] <= 0xC3) {
-        ih = (p.img[i + 5] << 8) | p.img[i + 6];
-        break;
-      }
-    }
-    // Rewrite image object header with the real height.
-    const placeholderStart = offsets[p.idImg];
-    // It is easier to rebuild this object in a second pass, so mark the value for the PDF object stream below.
-    p.height = ih;
-
-    offsets[p.idContent] = pos;
-    const scale = Math.min(pageW / 1754, pageH / ih);
-    const dw = 1754 * scale, dh = ih * scale;
-    const ox = (pageW - dw) / 2, oy = (pageH - dh) / 2;
-    const stream = `q\n${dw.toFixed(4)} 0 0 ${dh.toFixed(4)} ${ox.toFixed(4)} ${oy.toFixed(4)} cm\n/Im${p.idImg} Do\nQ\n`;
-    add(txt(`${p.idContent} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`));
-    offsets[p.idPage] = pos;
-    add(txt(`${p.idPage} 0 obj\n<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im${p.idImg} ${p.idImg} 0 R >> >> /Contents ${p.idContent} 0 R >>\nendobj\n`));
-  });
-
-  // Patch /Height values in image objects by rebuilding all chunks is unnecessarily complex.
-  // Since the image object was emitted with a placeholder, use the known source height range by making
-  // the placeholder equal to the actual image height before emission in the corrected implementation below.
-  // This function is replaced immediately after definition.
-
-  offsets[pagesId] = pos;
-  add(txt(`${pagesId} 0 obj\n<< /Type /Pages /Kids [${pages.map(p => p.idPage + ' 0 R').join(' ')}] /Count ${pages.length} >>\nendobj\n`));
-  offsets[catalogId] = pos;
-  add(txt(`${catalogId} 0 obj\n<< /Type /Catalog /Pages ${pagesId} 0 R >>\nendobj\n`));
-  const xref = pos;
-  add(txt(`xref\n0 ${catalogId + 1}\n0000000000 65535 f \n`));
-  for (let i = 1; i <= catalogId; i++) add(txt(String(offsets[i] || 0).padStart(10, '0') + ' 00000 n \n'));
-  add(txt(`trailer\n<< /Size ${catalogId + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xref}\n%%EOF`));
-  const blob = new Blob(chunks, { type: 'application/pdf' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-}
-
-// Correct PDF writer: reads the JPEG dimensions before writing its image object.
-function pdfFromCanvasImages(images, filename) {
-  const enc = new TextEncoder();
-  const chunks = [];
-  const offsets = [];
-  let pos = 0;
-  const add = b => { chunks.push(b); pos += b.length; };
-  const txt = s => enc.encode(s);
-  const readJpegSize = bytes => {
-    for (let i = 0; i < bytes.length - 9; i++) {
-      if (bytes[i] === 0xFF && bytes[i + 1] >= 0xC0 && bytes[i + 1] <= 0xC3) {
-        return { h: (bytes[i + 5] << 8) | bytes[i + 6], w: (bytes[i + 7] << 8) | bytes[i + 8] };
-      }
-    }
-    return { w: 1754, h: 1240 };
-  };
-  add(txt('%PDF-1.3\n%\xFF\xFF\xFF\xFF\n'));
-  let n = 2;
-  const pages = [];
-  const pageW = 841.89, pageH = 595.28;
-  images.forEach(data => {
-    const img = base64ToBytes(data);
-    const dim = readJpegSize(img);
-    const idImg = n++, idContent = n++, idPage = n++;
-    pages.push({ idPage, idImg, idContent, img, w: dim.w, h: dim.h });
-  });
-  const pagesId = n++, catalogId = n++;
-
-  pages.forEach(p => {
-    offsets[p.idImg] = pos;
-    add(txt(`${p.idImg} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${p.w} /Height ${p.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.img.length} >>\nstream\n`));
-    add(p.img);
-    add(txt('\nendstream\nendobj\n'));
-
-    offsets[p.idContent] = pos;
-    const scale = Math.min(pageW / p.w, pageH / p.h);
-    const dw = p.w * scale, dh = p.h * scale;
-    const ox = (pageW - dw) / 2, oy = (pageH - dh) / 2;
-    const stream = `q\n${dw.toFixed(4)} 0 0 ${dh.toFixed(4)} ${ox.toFixed(4)} ${oy.toFixed(4)} cm\n/Im${p.idImg} Do\nQ\n`;
-    add(txt(`${p.idContent} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`));
-
-    offsets[p.idPage] = pos;
-    add(txt(`${p.idPage} 0 obj\n<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im${p.idImg} ${p.idImg} 0 R >> >> /Contents ${p.idContent} 0 R >>\nendobj\n`));
-  });
-
-  offsets[pagesId] = pos;
-  add(txt(`${pagesId} 0 obj\n<< /Type /Pages /Kids [${pages.map(p => p.idPage + ' 0 R').join(' ')}] /Count ${pages.length} >>\nendobj\n`));
-  offsets[catalogId] = pos;
-  add(txt(`${catalogId} 0 obj\n<< /Type /Catalog /Pages ${pagesId} 0 R >>\nendobj\n`));
-  const xref = pos;
-  add(txt(`xref\n0 ${catalogId + 1}\n0000000000 65535 f \n`));
-  for (let i = 1; i <= catalogId; i++) add(txt(String(offsets[i] || 0).padStart(10, '0') + ' 00000 n \n'));
-  add(txt(`trailer\n<< /Size ${catalogId + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xref}\n%%EOF`));
-
-  const blob = new Blob(chunks, { type: 'application/pdf' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2500);
-}
-
-async function downloadRows(rows, filename) {
-  await waitForTamilFont();
-  const img = drawPdfPage(rows);
-  pdfFromCanvasImages([img], filename);
-}
-
-window.downloadPDF = id => {
-  const r = records.find(x => x.id === id);
-  if (r) downloadRows([r], `DYFI_${r.placeNo}_${r.date}.pdf`);
-};
-
-$("summaryPdf").onclick = () => {
-  if (!records.length) return alert('PDF உருவாக்க குறைந்தது ஒரு பதிவு தேவை.');
-  const sorted = [...records].sort((a, b) => a.placeNo - b.placeNo);
-  downloadRows(sorted, 'DYFI_Mayiladuthurai_Summary.pdf');
-};
-
-$("exportBtn").onclick = () => {
-  const blob = new Blob([JSON.stringify(records, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `DYFI_backup_${today()}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-};
-
-$("importFile").onchange = e => {
-  const f = e.target.files[0]; if (!f) return;
-  const rd = new FileReader();
-  rd.onload = () => {
-    try {
-      const data = JSON.parse(rd.result);
-      if (!Array.isArray(data)) throw 0;
-      records = data; save(); render(); alert('Backup restore செய்யப்பட்டது.');
-    } catch { alert('சரியான JSON backup file அல்ல.'); }
-    e.target.value = '';
-  };
-  rd.readAsText(f);
-};
-
-if (!records.length) {
-  const seedDate = '2026-07-31';
-  records = PLACES.map(p => ({
-    id: crypto.randomUUID(), date: seedDate, placeNo: p.no, place: p.name,
-    committees: p.defaults.committees, branches: p.defaults.branches,
-    members: p.defaults.members, meetings: p.defaults.meetings,
-    expected: p.defaults.expected, present: 0
-  }));
-  save();
-}
-initPlaces(); render();
+// Exact PDF: only the columns requested by the user; no committees/notes/extra metadata.
+const HEADERS=['','மொத்தம் கிளைகள்','உறுப்பினர் எண்ணிக்கை','நடைபெற்ற கூட்டம்','பங்கேற்க வேண்டியவர்கள்','பங்கேற்றவர்கள்'];
+function wrap(ctx,text,max){const words=String(text).trim().split(/\s+/);const lines=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width<=max)line=t;else{if(line)lines.push(line);line=w;if(ctx.measureText(line).width>max){let part='';for(const ch of Array.from(line)){const test=part+ch;if(ctx.measureText(test).width<=max||!part)part=test;else{lines.push(part);part=ch}}line=part}}}if(line)lines.push(line);return lines.length?lines:['']}
+function drawText(ctx,text,x,cy,max,font,align='center',lh=25){ctx.font=font;const lines=wrap(ctx,text,max);ctx.textAlign=align;ctx.textBaseline='middle';const start=cy-(lines.length-1)*lh/2;lines.forEach((s,i)=>ctx.fillText(s,x,start+i*lh));}
+async function waitFont(){if(document.fonts?.ready)await document.fonts.ready}
+function canvasForRows(rows){const W=1754,x=70,tw=W-x*2,y=240,headerH=118,rowH=72,pad=32;const H=y+headerH+rows.length*rowH+pad;const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#111';ctx.strokeStyle='#222';ctx.lineWidth=1.5;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='700 34px "Noto Sans Tamil",sans-serif';ctx.fillText('இந்திய கம்யூனிஸ்ட் கட்சி (மார்க்சிஸ்ட்)',W/2,66);ctx.font='700 29px "Noto Sans Tamil",sans-serif';ctx.fillText('மயிலாடுதுறை மாவட்டக்குழு',W/2,112);ctx.font='700 27px "Noto Sans Tamil",sans-serif';const titleDate=rows[0]?.date||today();ctx.fillText(monthTitle(titleDate),W/2,158);
+const widths=[78,290,270,250,470,306];ctx.strokeRect(x,y,tw,headerH+rows.length*rowH);let cx=x;for(let i=0;i<widths.length-1;i++){cx+=widths[i];ctx.beginPath();ctx.moveTo(cx,y);ctx.lineTo(cx,y+headerH+rows.length*rowH);ctx.stroke()}ctx.beginPath();ctx.moveTo(x,y+headerH);ctx.lineTo(x+tw,y+headerH);ctx.stroke();for(let i=1;i<=rows.length;i++){const yy=y+headerH+i*rowH;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x+tw,yy);ctx.stroke()}
+cx=x;HEADERS.forEach((h,i)=>{const w=widths[i];if(i)drawText(ctx,h,cx+w/2,y+headerH/2,w-24,'700 21px "Noto Sans Tamil",sans-serif','center',27);cx+=w});rows.forEach((r,i)=>{const cy=y+headerH+i*rowH;const vals=[r.placeNo+'.',r.branches,r.members,r.meetings,r.expected,r.present];cx=x;vals.forEach((v,j)=>{const w=widths[j];if(j===0){ctx.font='700 22px "Noto Sans Tamil",sans-serif';ctx.textAlign='center';ctx.fillText(v,cx+w/2,cy+rowH/2)}else{ctx.font='700 22px "Noto Sans Tamil",sans-serif';ctx.textAlign='center';ctx.fillText(String(v),cx+w/2,cy+rowH/2)}cx+=w})});return c.toDataURL('image/jpeg',.98)}
+function jpegBytes(data){const b=atob(data.split(',')[1]);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+function jpegDim(b){for(let i=0;i<b.length-9;i++)if(b[i]===255&&b[i+1]>=192&&b[i+1]<=195)return{h:(b[i+5]<<8)|b[i+6],w:(b[i+7]<<8)|b[i+8]};return{w:1754,h:1240}}
+function makePdf(img,filename){const enc=new TextEncoder(),parts=[],off=[];let pos=0,add=b=>{parts.push(b);pos+=b.length},txt=s=>enc.encode(s);add(txt('%PDF-1.3\n%\xFF\xFF\xFF\xFF\n'));const bytes=jpegBytes(img),d=jpegDim(bytes),im=3,ct=4,pg=5,pages=6,cat=7, pw=841.89,ph=595.28;off[im]=pos;add(txt(`${im} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${d.w} /Height ${d.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`));add(bytes);add(txt('\nendstream\nendobj\n'));const sc=Math.min(pw/d.w,ph/d.h),dw=d.w*sc,dh=d.h*sc,ox=(pw-dw)/2,oy=(ph-dh)/2,stream=`q\n${dw.toFixed(3)} 0 0 ${dh.toFixed(3)} ${ox.toFixed(3)} ${oy.toFixed(3)} cm\n/Im${im} Do\nQ\n`;off[ct]=pos;add(txt(`${ct} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`));off[pg]=pos;add(txt(`${pg} 0 obj\n<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im${im} ${im} 0 R >> >> /Contents ${ct} 0 R >>\nendobj\n`));off[pages]=pos;add(txt(`${pages} 0 obj\n<< /Type /Pages /Kids [${pg} 0 R] /Count 1 >>\nendobj\n`));off[cat]=pos;add(txt(`${cat} 0 obj\n<< /Type /Catalog /Pages ${pages} 0 R >>\nendobj\n`));const x=pos;add(txt(`xref\n0 8\n0000000000 65535 f \n`));for(let i=1;i<=7;i++)add(txt(String(off[i]||0).padStart(10,'0')+' 00000 n \n'));add(txt(`trailer\n<< /Size 8 /Root ${cat} 0 R >>\nstartxref\n${x}\n%%EOF`));const blob=new Blob(parts,{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+async function pdfRows(rows,name){await waitFont();makePdf(canvasForRows(rows),name)}
+window.downloadPDF=key=>{const r=records.find(x=>x.key===key);if(r)pdfRows([r],`DYFI_${r.placeNo}_${r.date}.pdf`)};
+$("summaryPdf").onclick=()=>{if(!records.length)return alert('PDF உருவாக்க குறைந்தது ஒரு பதிவு தேவை.');pdfRows([...records].sort((a,b)=>a.placeNo-b.placeNo),'DYFI_Mayiladuthurai_Summary.pdf')};
+fillPlaces();initFirebase();const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved){session=saved;openApp()}
