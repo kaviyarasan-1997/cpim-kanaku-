@@ -15,7 +15,7 @@
  <div class="top-actions"><button id="backupBtn" class="ghost">⬇ Backup</button><button id="restoreBtn" class="ghost">⬆ Restore</button><input id="restoreFile" type="file" accept="application/json" hidden><button id="pdfBtn" class="pdf-btn">▣ முழு PDF</button></div>
 </header>
 <main class="container">
- <section class="hero-card"><div><span class="eyebrow red">CPIM / DYFI WEB APP</span><h2>மாதாந்திர தரவு பதிவு</h2><p>Local Storage — சேமிக்கப்பட்ட தரவுதான் ஒரே இறுதி தரவு</p></div><div class="storage-pill"><span id="saveStateDot"></span><span id="saveState">LOCAL STORAGE</span></div></section>
+ <section class="hero-card"><div><span class="eyebrow red">CPIM / WEB APP</span><h2>மாதாந்திர தரவு பதிவு</h2><p>Local Storage — சேமிக்கப்பட்ட தரவுதான் ஒரே இறுதி தரவு</p></div><div class="storage-pill"><span id="saveStateDot"></span><span id="saveState">LOCAL STORAGE</span></div></section>
  <section class="card controls"><div class="control"><label>ஆண்டு</label><select id="year"></select></div><div class="control"><label>மாதம்</label><select id="month"></select></div><div class="control committee-control"><label>கமிட்டி / அமைப்பு</label><select id="committee"></select></div><div class="selected"><small>தேர்ந்தெடுத்த கமிட்டி</small><b id="selectedPlace">—</b></div></section>
  <section class="stats"><div class="stat"><span>சேமிக்கப்பட்ட கமிட்டிகள்</span><strong id="statRecords">0</strong></div><div class="stat"><span>மொத்த கிளைகள்</span><strong id="statBranches">0</strong></div><div class="stat"><span>உறுப்பினர் எண்ணிக்கை</span><strong id="statMembers">0</strong></div><div class="stat"><span>நடைபெற்ற கூட்டம்</span><strong id="statMeetings">0</strong></div></section>
  <section class="card form-card"><div class="section-title"><div><span class="badge">01</span><h2>தரவு உள்ளீடு</h2></div><span id="recordState" class="state">புதிய பதிவு</span></div>
@@ -26,7 +26,7 @@
  <div class="table-wrap"><table><thead><tr><th>எண்</th><th>கமிட்டி / அமைப்பு</th><th>மொத்தம் கிளைகள்</th><th>உறுப்பினர் எண்ணிக்கை</th><th>நடைபெற்ற<br>கூட்டம்</th><th>கூட்டத்தில் கலந்து<br>கொள்ள வேண்டியவர்கள்</th><th>பங்கேற்றவர்கள்</th><th>செயல்கள்</th></tr></thead><tbody id="recordsBody"></tbody></table><div id="empty" class="empty">இந்த மாதத்திற்கு எந்த பதிவும் சேமிக்கப்படவில்லை.</div></div></section>
  <section class="card"><div class="section-title"><div><span class="badge">03</span><h2>இந்த மாத சுருக்கம்</h2></div><span class="muted">PDF-ல் இந்த மாதத்தின் அனைத்து 13 கமிட்டிகளும் வரும்</span></div><div id="summaryGrid" class="summary-grid"></div></section>
 </main>
-<footer>DYFI Tamil Nadu • மயிலாடுதுறை மாவட்டக்குழு • CPIM Web App</footer>
+<footer> • மயிலாடுதுறை மாவட்டக்குழு • CPIM </footer>
 </div>
 <script src="app.js"></script>
 </body></html>
