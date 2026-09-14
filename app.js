@@ -1,76 +1,79 @@
-const FIREBASE_CONFIG={apiKey:"AIzaSyCaALqxdtEPCNxg5XPPG81T9853gOPO4qY",authDomain:"server-41203.firebaseapp.com",databaseURL:"https://server-41203-default-rtdb.firebaseio.com",projectId:"server-41203",storageBucket:"server-41203.firebasestorage.app",messagingSenderId:"26278139327",appId:"1:26278139327:web:db44a7e2d8d42d690abd0a"};
-const ADMIN_NAME="Kaviyarasan",ADMIN_PASSWORD="0987654321";
+const ADMIN_NAME='Kaviyarasan';
 const PLACES=[
-{no:1,name:"தரங்கம்பாடி",defaults:{branches:606,members:15,meetings:214,expected:169}},
-{no:2,name:"செம்பனார்கோவில்",defaults:{branches:188,members:7,meetings:119,expected:73}},
-{no:3,name:"குத்தாலம் கிழக்கு",defaults:{branches:217,members:1,meetings:13,expected:9}},
-{no:4,name:"குத்தாலம் மேற்கு",defaults:{branches:181,members:3,meetings:52,expected:28}},
-{no:5,name:"மயிலாடுதுறை (ஒ)",defaults:{branches:238,members:5,meetings:50,expected:29}},
-{no:6,name:"மயிலாடுதுறை (ந)",defaults:{branches:59,members:1,meetings:12,expected:8}},
-{no:7,name:"சீர்காழி",defaults:{branches:209,members:1,meetings:17,expected:12}},
-{no:8,name:"கொள்ளிடம்",defaults:{branches:277,members:9,meetings:159,expected:121}},
-{no:9,name:"மாணவர்",defaults:{branches:20,members:0,meetings:0,expected:0}},
-{no:10,name:"ஆசிரியர்",defaults:{branches:7,members:0,meetings:0,expected:0}},
-{no:11,name:"எல்.ஐ.சி",defaults:{branches:6,members:0,meetings:0,expected:0}},
-{no:12,name:"அரசு ஊழியர்",defaults:{branches:10,members:0,meetings:0,expected:0}},
-{no:13,name:"மாவட்ட மையம்",defaults:{branches:10,members:0,meetings:0,expected:0}}
+{no:1,name:'தரங்கம்பாடி'},{no:2,name:'செம்பனார்கோவில்'},{no:3,name:'குத்தாலம் கிழக்கு'},{no:4,name:'குத்தாலம் மேற்கு'},{no:5,name:'மயிலாடுதுறை (ஒ)'},{no:6,name:'மயிலாடுதுறை (ந)'},{no:7,name:'சீர்காழி'},{no:8,name:'கொள்ளிடம்'},{no:9,name:'மாணவர்'},{no:10,name:'ஆசிரியர்'},{no:11,name:'எல்.ஐ.சி'},{no:12,name:'அரசு ஊழியர்'},{no:13,name:'மாவட்ட மையம்'}
 ];
-const KEY="dyfi_mayiladuthurai_session_v4",DATA_KEY="dyfi_mayiladuthurai_cache_v4";
-const $=id=>document.getElementById(id);let db=null,records=[],session=null,activeCommittee=null;
-const today=()=>{const d=new Date();return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(d)},num=id=>Math.max(0,Number($(id).value)||0);
-const TAMIL_MONTHS=["ஜனவரி","பிப்ரவரி","மார்ச்","ஏப்ரல்","மே","ஜூன்","ஜூலை","ஆகஸ்ட்","செப்டம்பர்","அக்டோபர்","நவம்பர்","டிசம்பர்"];
-function monthTitle(dateStr){const d=dateStr?new Date(`${dateStr}T00:00:00`):new Date();return `${d.getFullYear()} ${TAMIL_MONTHS[d.getMonth()]} மாதம் நடைபெற்ற கூட்டம் விவரங்கள்`}
-function dMonthYear(dateStr){const d=dateStr?new Date(`${dateStr}T00:00:00`):new Date();return `${TAMIL_MONTHS[d.getMonth()]} ${d.getFullYear()}`}
-function updateMonthTexts(dateStr){const h=document.querySelector(".topbar p");if(h)h.textContent=monthTitle(dateStr);document.title=`DYFI Daily Data — மயிலாடுதுறை — ${dMonthYear(dateStr)}`;}
-function placesOptions(){return '<option value="">— கமிட்டியை தேர்வு செய்யவும் —</option>'+PLACES.map(p=>`<option value="${p.no}">${p.no}. ${p.name}</option>`).join('')}
-function initFirebase(){try{if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();setStatus('Server இணைக்கப்பட்டது','ok');return true}catch(e){setStatus('Server connection error','bad');return false}}
-function setStatus(t,c=''){const el=$("syncStatus");if(el){el.textContent=t;el.className='hint '+c}}
-function selectedPlace(){return PLACES.find(p=>p.no===Number($("place").value))}
-function activePlace(){return PLACES.find(p=>p.no===Number(activeCommittee))}
-function storageKey(c){return `${DATA_KEY}_${c}`}
-function normalize(r,key){return {key:key||r.key||`${r.date}__${r.placeNo}`,date:r.date,placeNo:Number(r.placeNo),place:r.place,branches:Number(r.branches)||0,members:Number(r.members)||0,meetings:Number(r.meetings)||0,expected:Number(r.expected)||0,present:Number(r.present)||0}}
-function dedupe(list){const m=new Map();list.forEach(r=>{const n=normalize(r);m.set(`${n.date}__${n.placeNo}`,n)});return [...m.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.placeNo-b.placeNo)}
-function saveCache(){if(activeCommittee)localStorage.setItem(storageKey(activeCommittee),JSON.stringify(records))}
-async function loadCommittee(c){activeCommittee=Number(c);records=[];const cached=JSON.parse(localStorage.getItem(storageKey(activeCommittee))||'[]');records=dedupe(cached);render();
- if(!db){setStatus('LocalStorage மட்டும்','bad');return}
- setStatus('Server data loading…');
- try{const snap=await db.ref(`dyfiDaily/${activeCommittee}`).once('value');const remote=[];snap.forEach(ch=>remote.push(normalize(ch.val(),ch.key)));records=dedupe([...remote,...records]);saveCache();render();setStatus('Server synced','ok');}catch(e){setStatus('Server read error — local data','bad');console.error(e)}
+const KEY='dyfi_mayiladuthurai_monthly_v7';
+const MONTHS=['ஜனவரி','பிப்ரவரி','மார்ச்','ஏப்ரல்','மே','ஜூன்','ஜூலை','ஆகஸ்ட்','செப்டம்பர்','அக்டோபர்','நவம்பர்','டிசம்பர்'];
+const $=id=>document.getElementById(id);
+let data=loadData(), currentKey='', currentRecord=null;
+function istNow(){return new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));}
+function pad(n){return String(n).padStart(2,'0')}
+function currentPeriod(){const d=istNow();return {year:d.getFullYear(),month:d.getMonth()+1}}
+function periodKey(){return `${$('year').value}-${pad($('month').value)}`}
+function recordKey(placeNo){return `${periodKey()}__${placeNo}`}
+function emptyRecord(placeNo){const p=PLACES.find(x=>x.no===Number(placeNo));return {key:recordKey(placeNo),year:Number($('year').value),month:Number($('month').value),placeNo:p.no,place:p.name,branches:0,members:0,meetings:0,expected:0,present:0}}
+function loadData(){try{const x=JSON.parse(localStorage.getItem(KEY)||'{}');return x&&typeof x==='object'?x:{}}catch{return {}}}
+function persist(){localStorage.setItem(KEY,JSON.stringify(data));$('saveState').textContent='LOCAL STORAGE • SAVED';$('saveStateDot').className='saved'}
+function setDirty(t='LOCAL STORAGE • READY'){$('saveState').textContent=t;$('saveStateDot').className=''}
+function setup(){
+ const now=currentPeriod();$('year').innerHTML=Array.from({length:8},(_,i)=>now.year-4+i).map(y=>`<option value="${y}">${y}</option>`).join('');$('year').value=now.year;
+ $('month').innerHTML=MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');$('month').value=now.month;
+ $('committee').innerHTML=PLACES.map(p=>`<option value="${p.no}">${p.no}. ${p.name}</option>`).join('');$('committee').value=1;
+ bind(); updatePeriod(); loadCurrent(); render();
 }
-async function writeRecord(obj){const key=`${obj.date}__${obj.placeNo}`;obj.key=key;records=dedupe([...records,obj]);saveCache();render();
- if(!db)return setStatus('LocalStorage saved','bad');
- try{await db.ref(`dyfiDaily/${activeCommittee}/${key}`).set(obj);setStatus('Saved to server','ok');}catch(e){setStatus('Server save failed — local copy kept','bad');console.error(e)}
+function bind(){
+ ['year','month'].forEach(id=>$(id).addEventListener('change',()=>{updatePeriod();loadCurrent();render()}));
+ $('committee').addEventListener('change',()=>{loadCurrent();render()});
+ $('search').addEventListener('input',render);
+ $('zeroBtn').onclick=()=>{['branches','members','meetings','expected','present'].forEach(id=>$(id).value=0);setDirty('மாற்றம் செய்யப்பட்டுள்ளது — சேமிக்கவும்')};
+ $('dataForm').onsubmit=e=>{e.preventDefault();saveCurrent()};
+ $('pdfBtn').onclick=downloadFullPdf;
+ $('backupBtn').onclick=backup;
+ $('restoreBtn').onclick=()=>$('restoreFile').click();
+ $('restoreFile').onchange=restore;
 }
-async function removeRecord(r){records=records.filter(x=>x.key!==r.key);saveCache();render();if(db){try{await db.ref(`dyfiDaily/${activeCommittee}/${r.key}`).remove();setStatus('Deleted from server','ok')}catch(e){setStatus('Server delete failed','bad')}}}
-function fillPlaces(){const html=placesOptions();$("loginCommittee").innerHTML=html;$("place").innerHTML='<option value="">— இடத்தை தேர்வு செய்யவும் —</option>'+PLACES.map(p=>`<option value="${p.no}">${p.no}. ${p.name}</option>`).join('');$("adminCommittee").innerHTML=html}
-function showPlace(){const p=selectedPlace();$("placeNo").textContent=p?p.no:'—';$("placeName").textContent=p?p.name:'—'}
-function resetForm(){$("dataForm").reset();$("editKey").value='';$("date").value=today();updateMonthTexts($("date").value);$("saveBtn").textContent='＋ பதிவு சேமிக்கவும்';showPlace()}
-function render(){const q=$("search").value.trim().toLowerCase();const list=records.filter(r=>(`${r.place} ${r.date}`).toLowerCase().includes(q));$("recordsBody").innerHTML=list.map(r=>`<tr><td>${r.placeNo}.</td><td>${r.date}</td><td class="place-cell">${r.place}</td><td>${r.branches}</td><td>${r.members}</td><td>${r.meetings}</td><td>${r.expected}</td><td>${r.present}</td><td><div class="actions"><button class="icon-btn" onclick="editRecord('${r.key}')">✏️</button><button class="icon-btn" onclick="downloadPDF('${r.key}')">📄</button><button class="icon-btn danger" onclick="deleteRecord('${r.key}')">🗑️</button></div></td></tr>`).join('');$("empty").style.display=list.length?'none':'block';const sum=k=>records.reduce((a,r)=>a+(Number(r[k])||0),0);$("statRecords").textContent=records.length;$("statBranches").textContent=sum('branches').toLocaleString('en-IN');$("statMembers").textContent=sum('members').toLocaleString('en-IN');$("statMeetings").textContent=sum('meetings').toLocaleString('en-IN');$("summaryGrid").innerHTML=activePlace()?`<div class="summary-item"><h3>${activePlace().no}. ${activePlace().name}</h3><p>பதிவுகள்: <b>${records.length}</b></p><p>கிளைகள்: <b>${sum('branches')}</b></p><p>உறுப்பினர்கள்: <b>${sum('members')}</b></p><p>கூட்டம்: <b>${sum('meetings')}</b></p></div>`:''}
-window.editRecord=key=>{const r=records.find(x=>x.key===key);if(!r)return;$("editKey").value=r.key;$("date").value=r.date;updateMonthTexts(r.date);$("place").value=r.placeNo;showPlace();['branches','members','meetings','expected','present'].forEach(k=>$(k).value=r[k]);$("saveBtn").textContent='✓ மாற்றத்தை சேமிக்கவும்';scrollTo({top:0,behavior:'smooth'})};
-window.deleteRecord=async key=>{const r=records.find(x=>x.key===key);if(r&&confirm('இந்த பதிவை நீக்க வேண்டுமா?'))await removeRecord(r)};
-$("place").addEventListener('change',()=>{showPlace();const p=selectedPlace();if(!p)return;['branches','members','meetings','expected'].forEach(k=>$(k).value=p.defaults[k]);$("present").value=''})
-$("resetBtn").onclick=resetForm;$("date").addEventListener('change',()=>updateMonthTexts($("date").value));$("search").addEventListener('input',render);
-$("dataForm").onsubmit=async e=>{e.preventDefault();const p=selectedPlace();if(!p||!activeCommittee)return alert('கமிட்டி / இடத்தை தேர்வு செய்யவும்.');const oldKey=$("editKey").value;const obj={key:`${$("date").value}__${p.no}`,date:$("date").value,placeNo:p.no,place:p.name,branches:num('branches'),members:num('members'),meetings:num('meetings'),expected:num('expected'),present:num('present')};if(oldKey&&oldKey!==obj.key&&records.some(r=>r.key===obj.key))return alert('இந்த தேதி + இடத்திற்கு ஏற்கனவே பதிவு உள்ளது. அதை Edit செய்து Save செய்யவும்.');await writeRecord(obj);resetForm();alert(oldKey?'மாற்றம் சேமிக்கப்பட்டது.':'பதிவு சேமிக்கப்பட்டது.')};
-async function loginUser(){const name=$("loginName").value.trim();const c=Number($("loginCommittee").value);if(!name||!c)return;session={role:'user',name,committee:c};localStorage.setItem(KEY,JSON.stringify(session));openApp()}
-async function loginAdmin(){if($("adminName").value.trim()!==ADMIN_NAME||$("adminPassword").value!==ADMIN_PASSWORD)return alert('Admin name / password தவறாக உள்ளது.');session={role:'admin',name:ADMIN_NAME,committee:Number($("adminCommittee").value)||1};localStorage.setItem(KEY,JSON.stringify(session));openApp()}
-function openApp(){if(!session)return;$("loginScreen").classList.add('hidden');$("app").classList.remove('hidden');$("sessionRole").textContent=session.role==='admin'?'ADMIN':'கமிட்டி';$("sessionUser").textContent=session.name;$("sessionCommittee").textContent=PLACES.find(p=>p.no===Number(session.committee))?.name||'—';$("adminSwitch").classList.toggle('hidden',session.role!=='admin');$("adminCommittee").value=session.committee;$("place").disabled=false;activeCommittee=session.committee;loadCommittee(session.committee);resetForm()}
-$("userLoginForm").onsubmit=e=>{e.preventDefault();loginUser()};$("adminLoginForm").onsubmit=e=>{e.preventDefault();loginAdmin()};$("userTab").onclick=()=>{$("userTab").classList.add('active');$("adminTab").classList.remove('active');$("userLoginForm").classList.remove('hidden');$("adminLoginForm").classList.add('hidden')};$("adminTab").onclick=()=>{$("adminTab").classList.add('active');$("userTab").classList.remove('active');$("adminLoginForm").classList.remove('hidden');$("userLoginForm").classList.add('hidden')};
-$("adminCommittee").onchange=async()=>{if(session?.role!=='admin')return;session.committee=Number($("adminCommittee").value);localStorage.setItem(KEY,JSON.stringify(session));$("sessionCommittee").textContent=PLACES.find(p=>p.no===session.committee)?.name||'—';resetForm();await loadCommittee(session.committee)};
-$("logoutBtn").onclick=()=>{localStorage.removeItem(KEY);location.reload()};
-$("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(records,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`DYFI_${activeCommittee}_backup_${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
-$("importFile").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=async()=>{try{const data=JSON.parse(rd.result);if(!Array.isArray(data))throw 0;for(const r of dedupe(data))await writeRecord(r);alert('Backup restore செய்யப்பட்டது.')}catch{alert('சரியான JSON backup இல்லை.')}e.target.value=''};rd.readAsText(f)};
-
-// Exact PDF: only the columns requested by the user; no committees/notes/extra metadata.
-const HEADERS=['','மொத்தம் கிளைகள்','உறுப்பினர் எண்ணிக்கை','நடைபெற்ற கூட்டம்','பங்கேற்க வேண்டியவர்கள்','பங்கேற்றவர்கள்'];
-function wrap(ctx,text,max){const words=String(text).trim().split(/\s+/);const lines=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width<=max)line=t;else{if(line)lines.push(line);line=w;if(ctx.measureText(line).width>max){let part='';for(const ch of Array.from(line)){const test=part+ch;if(ctx.measureText(test).width<=max||!part)part=test;else{lines.push(part);part=ch}}line=part}}}if(line)lines.push(line);return lines.length?lines:['']}
-function drawText(ctx,text,x,cy,max,font,align='center',lh=25){ctx.font=font;const lines=wrap(ctx,text,max);ctx.textAlign=align;ctx.textBaseline='middle';const start=cy-(lines.length-1)*lh/2;lines.forEach((s,i)=>ctx.fillText(s,x,start+i*lh));}
-async function waitFont(){if(document.fonts?.ready)await document.fonts.ready}
-function canvasForRows(rows){const W=1754,x=70,tw=W-x*2,y=240,headerH=118,rowH=72,pad=32;const H=y+headerH+rows.length*rowH+pad;const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#111';ctx.strokeStyle='#222';ctx.lineWidth=1.5;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='700 34px "Noto Sans Tamil",sans-serif';ctx.fillText('இந்திய கம்யூனிஸ்ட் கட்சி (மார்க்சிஸ்ட்)',W/2,66);ctx.font='700 29px "Noto Sans Tamil",sans-serif';ctx.fillText('மயிலாடுதுறை மாவட்டக்குழு',W/2,112);ctx.font='700 27px "Noto Sans Tamil",sans-serif';const titleDate=rows[0]?.date||today();ctx.fillText(monthTitle(titleDate),W/2,158);
-const widths=[78,290,270,250,470,306];ctx.strokeRect(x,y,tw,headerH+rows.length*rowH);let cx=x;for(let i=0;i<widths.length-1;i++){cx+=widths[i];ctx.beginPath();ctx.moveTo(cx,y);ctx.lineTo(cx,y+headerH+rows.length*rowH);ctx.stroke()}ctx.beginPath();ctx.moveTo(x,y+headerH);ctx.lineTo(x+tw,y+headerH);ctx.stroke();for(let i=1;i<=rows.length;i++){const yy=y+headerH+i*rowH;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x+tw,yy);ctx.stroke()}
-cx=x;HEADERS.forEach((h,i)=>{const w=widths[i];if(i)drawText(ctx,h,cx+w/2,y+headerH/2,w-24,'700 21px "Noto Sans Tamil",sans-serif','center',27);cx+=w});rows.forEach((r,i)=>{const cy=y+headerH+i*rowH;const vals=[r.placeNo+'.',r.branches,r.members,r.meetings,r.expected,r.present];cx=x;vals.forEach((v,j)=>{const w=widths[j];if(j===0){ctx.font='700 22px "Noto Sans Tamil",sans-serif';ctx.textAlign='center';ctx.fillText(v,cx+w/2,cy+rowH/2)}else{ctx.font='700 22px "Noto Sans Tamil",sans-serif';ctx.textAlign='center';ctx.fillText(String(v),cx+w/2,cy+rowH/2)}cx+=w})});return c.toDataURL('image/jpeg',.98)}
-function jpegBytes(data){const b=atob(data.split(',')[1]);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
-function jpegDim(b){for(let i=0;i<b.length-9;i++)if(b[i]===255&&b[i+1]>=192&&b[i+1]<=195)return{h:(b[i+5]<<8)|b[i+6],w:(b[i+7]<<8)|b[i+8]};return{w:1754,h:1240}}
-function makePdf(img,filename){const enc=new TextEncoder(),parts=[],off=[];let pos=0,add=b=>{parts.push(b);pos+=b.length},txt=s=>enc.encode(s);add(txt('%PDF-1.3\n%\xFF\xFF\xFF\xFF\n'));const bytes=jpegBytes(img),d=jpegDim(bytes),im=3,ct=4,pg=5,pages=6,cat=7, pw=841.89,ph=595.28;off[im]=pos;add(txt(`${im} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${d.w} /Height ${d.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`));add(bytes);add(txt('\nendstream\nendobj\n'));const sc=Math.min(pw/d.w,ph/d.h),dw=d.w*sc,dh=d.h*sc,ox=(pw-dw)/2,oy=(ph-dh)/2,stream=`q\n${dw.toFixed(3)} 0 0 ${dh.toFixed(3)} ${ox.toFixed(3)} ${oy.toFixed(3)} cm\n/Im${im} Do\nQ\n`;off[ct]=pos;add(txt(`${ct} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`));off[pg]=pos;add(txt(`${pg} 0 obj\n<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im${im} ${im} 0 R >> >> /Contents ${ct} 0 R >>\nendobj\n`));off[pages]=pos;add(txt(`${pages} 0 obj\n<< /Type /Pages /Kids [${pg} 0 R] /Count 1 >>\nendobj\n`));off[cat]=pos;add(txt(`${cat} 0 obj\n<< /Type /Catalog /Pages ${pages} 0 R >>\nendobj\n`));const x=pos;add(txt(`xref\n0 8\n0000000000 65535 f \n`));for(let i=1;i<=7;i++)add(txt(String(off[i]||0).padStart(10,'0')+' 00000 n \n'));add(txt(`trailer\n<< /Size 8 /Root ${cat} 0 R >>\nstartxref\n${x}\n%%EOF`));const blob=new Blob(parts,{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
-async function pdfRows(rows,name){await waitFont();makePdf(canvasForRows(rows),name)}
-window.downloadPDF=key=>{const r=records.find(x=>x.key===key);if(r)pdfRows([r],`DYFI_${r.placeNo}_${r.date}.pdf`)};
-$("summaryPdf").onclick=()=>{if(!records.length)return alert('PDF உருவாக்க குறைந்தது ஒரு பதிவு தேவை.');pdfRows([...records].sort((a,b)=>a.placeNo-b.placeNo),'DYFI_Mayiladuthurai_Summary.pdf')};
-fillPlaces();initFirebase();const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved){session=saved;openApp()}
+function updatePeriod(){const text=`${$('year').value} ${MONTHS[Number($('month').value)-1]}`;$('monthTitle').textContent=`${text} மாதம் நடைபெற்ற கூட்டம் விவரங்கள்`;$('periodLabel').textContent=text;document.title=`DYFI — ${text} — மயிலாடுதுறை`}
+function loadCurrent(){const p=PLACES.find(x=>x.no===Number($('committee').value));currentKey=recordKey(p.no);currentRecord=data[currentKey]||emptyRecord(p.no);$('placeNo').textContent=p.no;$('placeName').textContent=p.name;$('selectedPlace').textContent=`${p.no}. ${p.name}`;const exists=!!data[currentKey];$('recordState').textContent=exists?'✓ சேமிக்கப்பட்ட பதிவு':'புதிய பதிவு — 0';['branches','members','meetings','expected','present'].forEach(k=>$(k).value=Number(currentRecord[k])||0);setDirty(exists?'LOCAL STORAGE • SAVED':'LOCAL STORAGE • READY')}
+function saveCurrent(){const p=PLACES.find(x=>x.no===Number($('committee').value));const obj={key:currentKey,year:Number($('year').value),month:Number($('month').value),placeNo:p.no,place:p.name,branches:n('branches'),members:n('members'),meetings:n('meetings'),expected:n('expected'),present:n('present')};data[currentKey]=obj;persist();currentRecord=obj;$('recordState').textContent='✓ சேமிக்கப்பட்ட பதிவு';render();alert(`${p.name} — ${MONTHS[obj.month-1]} ${obj.year} பதிவு சேமிக்கப்பட்டது.`)}
+function n(id){return Math.max(0,Math.floor(Number($(id).value)||0))}
+function recordsForPeriod(){return PLACES.map(p=>data[`${periodKey()}__${p.no}`]).filter(Boolean).sort((a,b)=>a.placeNo-b.placeNo)}
+function allRowsForPeriod(){return PLACES.map(p=>data[`${periodKey()}__${p.no}`]||emptyRecord(p.no)).sort((a,b)=>a.placeNo-b.placeNo)}
+function render(){const q=$('search').value.trim().toLowerCase();const rows=recordsForPeriod().filter(r=>r.place.toLowerCase().includes(q));$('recordsBody').innerHTML=rows.map(r=>`<tr><td>${r.placeNo}</td><td class="place-cell">${r.place}</td><td>${r.branches}</td><td>${r.members}</td><td>${r.meetings}</td><td>${r.expected}</td><td>${r.present}</td><td><div class="actions"><button class="icon-btn" title="Edit" onclick="editRecord(${r.placeNo})">✏️</button><button class="icon-btn danger" title="Delete" onclick="deleteRecord(${r.placeNo})">🗑️</button></div></td></tr>`).join('');$('empty').style.display=rows.length?'none':'block';const all=allRowsForPeriod();const sum=k=>all.reduce((a,r)=>a+(Number(r[k])||0),0);$('statRecords').textContent=recordsForPeriod().length;$('statBranches').textContent=sum('branches').toLocaleString('en-IN');$('statMembers').textContent=sum('members').toLocaleString('en-IN');$('statMeetings').textContent=sum('meetings').toLocaleString('en-IN');$('summaryGrid').innerHTML=all.map(r=>`<div class="summary-item ${data[r.key]?'saved-item':''}"><h3>${r.placeNo}. ${r.place}</h3><p>கிளைகள் <b>${r.branches}</b></p><p>உறுப்பினர்கள் <b>${r.members}</b></p><p>கூட்டம் <b>${r.meetings}</b></p><p>வேண்டியவர்கள் <b>${r.expected}</b></p><p>பங்கேற்றவர்கள் <b>${r.present}</b></p></div>`).join('')}
+window.editRecord=no=>{$('committee').value=no;loadCurrent();window.scrollTo({top:0,behavior:'smooth'})};
+window.deleteRecord=no=>{const key=recordKey(no);const r=data[key];if(!r)return;if(confirm(`${r.place} — இந்த ${MONTHS[r.month-1]} ${r.year} பதிவை முழுமையாக நீக்கவா?`)){delete data[key];persist();loadCurrent();render()}};
+function backup(){const blob=new Blob([JSON.stringify({app:'DYFI Mayiladuthurai Monthly Data',version:7,exportedAt:new Date().toISOString(),data},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='DYFI_Mayiladuthurai_Backup.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function restore(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const obj=JSON.parse(rd.result);if(!obj.data||typeof obj.data!=='object')throw Error('bad');if(confirm('Backup data-வை restore செய்தால் தற்போதைய Local Storage data replace ஆகும். தொடரவா?')){data=obj.data;persist();loadCurrent();render();alert('Backup restore முடிந்தது.')}}catch(err){alert('Backup file சரியான format-ல் இல்லை.')}e.target.value=''};rd.readAsText(f)}
+// PDF — single full report for the selected month/year. Unrecorded committees are explicitly 0.
+const HEADERS=['எண்','கமிட்டி / அமைப்பு','மொத்தம் கிளைகள்','உறுப்பினர் எண்ணிக்கை','நடைபெற்ற கூட்டம்','கூட்டத்தில் கலந்து கொள்ள வேண்டியவர்கள்','பங்கேற்றவர்கள்'];
+function wrap(ctx,text,max){const words=String(text).trim().split(/\s+/);const out=[];let line='';for(const w of words){const t=line?line+' '+w:w;if(ctx.measureText(t).width<=max){line=t}else{if(line)out.push(line);line=w;if(ctx.measureText(line).width>max){let part='';for(const ch of Array.from(line)){const z=part+ch;if(ctx.measureText(z).width<=max||!part)part=z;else{out.push(part);part=ch}}line=part}}}if(line)out.push(line);return out.length?out:['']}
+function drawWrap(ctx,text,x,y,max,font,lh){ctx.font=font;ctx.textAlign='center';ctx.textBaseline='middle';const lines=wrap(ctx,text,max);const start=y-(lines.length-1)*lh/2;lines.forEach((s,i)=>ctx.fillText(s,x,start+i*lh))}
+async function waitFonts(){if(document.fonts?.ready)await document.fonts.ready}
+function canvasReport(rows){
+ const W=1754,margin=48,tableY=205,widths=[80,285,245,235,235,405,203],headerH=96,rowH=65,totalH=70,footer=70;
+ const totals={branches:rows.reduce((a,r)=>a+(Number(r.branches)||0),0),members:rows.reduce((a,r)=>a+(Number(r.members)||0),0),meetings:rows.reduce((a,r)=>a+(Number(r.meetings)||0),0),expected:rows.reduce((a,r)=>a+(Number(r.expected)||0),0),present:rows.reduce((a,r)=>a+(Number(r.present)||0),0)};
+ const H=tableY+headerH+rows.length*rowH+totalH+footer;
+ const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d');
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#111';ctx.strokeStyle='#111';ctx.lineWidth=1.4;
+ ctx.font='700 31px "Noto Sans Tamil",sans-serif';ctx.textAlign='center';ctx.fillText('இந்திய கம்யூனிஸ்ட் கட்சி (மார்க்சிஸ்ட்)',W/2,43);
+ ctx.font='700 27px "Noto Sans Tamil",sans-serif';ctx.fillText('மயிலாடுதுறை மாவட்டக்குழு',W/2,80);
+ ctx.font='700 25px "Noto Sans Tamil",sans-serif';ctx.fillText(`${rows[0].year} ${MONTHS[rows[0].month-1]} மாதம் நடைபெற்ற கூட்டம் விவரங்கள்`,W/2,120);
+ ctx.font='500 17px "Noto Sans Tamil",sans-serif';ctx.fillText('DYFI • CPIM Web App',W/2,150);
+ const totalW=widths.reduce((a,b)=>a+b,0),x=(W-totalW)/2;
+ const tableBottom=tableY+headerH+rows.length*rowH+totalH;
+ ctx.strokeRect(x,tableY,totalW,headerH+rows.length*rowH+totalH);
+ let cx=x;for(let i=1;i<widths.length;i++){cx+=widths[i-1];ctx.beginPath();ctx.moveTo(cx,tableY);ctx.lineTo(cx,tableBottom);ctx.stroke()}
+ ctx.beginPath();ctx.moveTo(x,tableY+headerH);ctx.lineTo(x+totalW,tableY+headerH);ctx.stroke();
+ for(let i=1;i<=rows.length;i++){const yy=tableY+headerH+i*rowH;ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x+totalW,yy);ctx.stroke()}
+ const totalY=tableY+headerH+rows.length*rowH;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,totalY);ctx.lineTo(x+totalW,totalY);ctx.stroke();ctx.lineWidth=1.4;
+ cx=x;HEADERS.forEach((h,i)=>{drawWrap(ctx,h,cx+widths[i]/2,tableY+headerH/2,widths[i]-18,'700 18px "Noto Sans Tamil",sans-serif',22);cx+=widths[i]});
+ rows.forEach((r,i)=>{const vals=[r.placeNo+'.',r.place,r.branches,r.members,r.meetings,r.expected,r.present];let xx=x;vals.forEach((v,j)=>{const w=widths[j];drawWrap(ctx,String(v),xx+w/2,tableY+headerH+i*rowH+rowH/2,w-(j===1?18:12),j===1?'700 19px "Noto Sans Tamil",sans-serif':'700 20px "Noto Sans Tamil",sans-serif',23);xx+=w})});
+ const totalVals=['','மொத்தம்',totals.branches,totals.members,totals.meetings,totals.expected,totals.present];
+ let tx=x;totalVals.forEach((v,j)=>{const w=widths[j];drawWrap(ctx,String(v),tx+w/2,totalY+totalH/2,w-(j===1?18:12),'700 20px "Noto Sans Tamil",sans-serif',24);tx+=w});
+ ctx.font='600 16px "Noto Sans Tamil",sans-serif';ctx.textAlign='center';ctx.fillText(`மொத்தம்: ${rows.length} கமிட்டிகள்`,W/2,H-30);
+ return c.toDataURL('image/jpeg',.98)
+}
+function jpegBytes(data){const b=atob(data.split(',')[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+function jpegDim(b){for(let i=0;i<b.length-9;i++)if(b[i]===255&&b[i+1]>=192&&b[i+1]<=195)return{h:(b[i+5]<<8)|b[i+6],w:(b[i+7]<<8)|b[i+8]};return{w:1754,h:1000}}
+function makePdf(img,filename){const enc=new TextEncoder(),parts=[],off=[];let pos=0;const add=b=>{parts.push(b);pos+=b.length},txt=s=>enc.encode(s);add(txt('%PDF-1.3\n%\xFF\xFF\xFF\xFF\n'));const bytes=jpegBytes(img),d=jpegDim(bytes),im=3,ct=4,pg=5,pages=6,cat=7,pw=841.89,ph=595.28;off[im]=pos;add(txt(`${im} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${d.w} /Height ${d.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`));add(bytes);add(txt('\nendstream\nendobj\n'));const sc=Math.min((pw-24)/d.w,(ph-24)/d.h),dw=d.w*sc,dh=d.h*sc,ox=(pw-dw)/2,oy=(ph-dh)/2,stream=`q\n${dw.toFixed(3)} 0 0 ${dh.toFixed(3)} ${ox.toFixed(3)} ${oy.toFixed(3)} cm\n/Im${im} Do\nQ\n`;off[ct]=pos;add(txt(`${ct} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`));off[pg]=pos;add(txt(`${pg} 0 obj\n<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im${im} ${im} 0 R >> >> /Contents ${ct} 0 R >>\nendobj\n`));off[pages]=pos;add(txt(`${pages} 0 obj\n<< /Type /Pages /Kids [${pg} 0 R] /Count 1 >>\nendobj\n`));off[cat]=pos;add(txt(`${cat} 0 obj\n<< /Type /Catalog /Pages ${pages} 0 R >>\nendobj\n`));const x=pos;add(txt(`xref\n0 8\n0000000000 65535 f \n`));for(let i=1;i<=7;i++)add(txt(String(off[i]||0).padStart(10,'0')+' 00000 n \n'));add(txt(`trailer\n<< /Size 8 /Root ${cat} 0 R >>\nstartxref\n${x}\n%%EOF`));const blob=new Blob(parts,{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2500)}
+async function downloadFullPdf(){await waitFonts();const rows=allRowsForPeriod();const img=canvasReport(rows);makePdf(img,`DYFI_Mayiladuthurai_${$('year').value}_${pad($('month').value)}_Full_Report.pdf`)}
+setup();
